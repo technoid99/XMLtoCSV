@@ -13,20 +13,41 @@
   #file-input {
     margin-bottom: 10px;
   }
+  #upload-status, #convert-status {
+    display: none;
+  }
   #result {
     white-space: pre;
+    display: none;
   }
 </style>
 </head>
 <body>
 <h1>XML to CSV Converter</h1>
+<div id="upload-status">
+  Uploading XML file <span id="upload-status-icon">...</span>
+</div>
 <input type="file" id="file-input" accept=".xml">
 <div>
   <button onclick="convertXMLtoCSV()">Convert</button>
+  <div id="convert-status" style="display:none;">
+    Converting XML to CSV <span id="convert-status-icon">...</span>
+  </div>
 </div>
 <div id="result"></div>
+<button id="download-csv" style="display:none;">Download CSV</button>
 
 <script>
+  function updateStatus(statusElement, statusIconElement, message, icon) {
+    statusElement.style.display = 'block';
+    statusIconElement.textContent = message;
+    if (icon === 'check') {
+      statusIconElement.style.color = 'green';
+    } else if (icon === 'error') {
+      statusIconElement.style.color = 'red';
+    }
+  }
+
   function convertXMLtoCSV() {
     const fileInput = document.getElementById('file-input');
     const file = fileInput.files[0];
@@ -38,6 +59,7 @@
 
     const reader = new FileReader();
     reader.onload = function(event) {
+      updateStatus(document.getElementById('convert-status'), document.getElementById('convert-status-icon'), 'Conversion completed', 'check');
       const xml = event.target.result;
       const parser = new DOMParser();
       const xmlDoc = parser.parseFromString(xml, 'text/xml');
@@ -54,11 +76,21 @@
         csvContent += rowContent.slice(0, -1) + '\n'; // Remove trailing comma and add new line
       }
 
-      document.getElementById('result').innerText = csvContent;
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const downloadButton = document.getElementById('download-csv');
+      downloadButton.href = url;
+      downloadButton.download = 'converted.csv';
+      downloadButton.style.display = 'block';
     };
 
+    updateStatus(document.getElementById('convert-status'), document.getElementById('convert-status-icon'), 'Converting XML to CSV...', '...');
     reader.readAsText(file);
   }
+
+  document.getElementById('file-input').addEventListener('change', function() {
+    updateStatus(document.getElementById('upload-status'), document.getElementById('upload-status-icon'), 'XML file uploaded', 'check');
+  });
 </script>
 </body>
 </html>
