@@ -4,93 +4,57 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>XML to CSV Converter</title>
-<style>
-  body {
-    font-family: Arial, sans-serif;
-    margin: 0;
-    padding: 20px;
-  }
-  #file-input {
-    margin-bottom: 10px;
-  }
-  #upload-status, #convert-status {
-    display: none;
-  }
-  #result {
-    white-space: pre;
-    display: none;
-  }
-</style>
 </head>
 <body>
 <h1>XML to CSV Converter</h1>
-<div id="upload-status">
-  Uploading XML file <span id="upload-status-icon">...</span>
-</div>
-<input type="file" id="file-input" accept=".xml">
-<div>
-  <button onclick="convertXMLtoCSV()">Convert</button>
-  <div id="convert-status" style="display:none;">
-    Converting XML to CSV <span id="convert-status-icon">...</span>
-  </div>
-</div>
-<div id="result"></div>
-<a id="download-csv" style="display:none;">Download CSV</a>
+<input type="file" id="fileInput" accept=".xml">
+<button onclick="convertToCSV()">Convert</button>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
 
 <script>
-  function updateStatus(statusElement, statusIconElement, message, icon) {
-    statusElement.style.display = 'block';
-    statusIconElement.textContent = message;
-    if (icon === 'check') {
-      statusIconElement.style.color = 'green';
-    } else if (icon === 'error') {
-      statusIconElement.style.color = 'red';
-    }
-  }
-
-  function convertXMLtoCSV() {
-    const fileInput = document.getElementById('file-input');
+function convertToCSV() {
+    const fileInput = document.getElementById('fileInput');
     const file = fileInput.files[0];
-
-    if (!file) {
-      alert('Please select a file.');
-      return;
-    }
-
     const reader = new FileReader();
-    reader.onload = function(event) {
-      updateStatus(document.getElementById('convert-status'), document.getElementById('convert-status-icon'), 'Conversion completed', 'check');
-      const xml = event.target.result;
-      const parser = new DOMParser();
-      const xmlDoc = parser.parseFromString(xml, 'text/xml');
-      
-      const rows = xmlDoc.querySelectorAll('*');
-      let csvContent = '';
 
-      for (const row of rows) {
-        const cells = row.children;
-        let rowContent = '';
-        for (const cell of cells) {
-          rowContent += cell.textContent.trim() + ',';
-        }
-        csvContent += rowContent.slice(0, -1) + '\n'; // Remove trailing comma and add new line
-      }
+    reader.onload = function(e) {
+        const xmlString = e.target.result;
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(xmlString, 'text/xml');
 
-      const blob = new Blob([csvContent], { type: 'text/csv' });
-      const url = URL.createObjectURL(blob);
-      const downloadLink = document.getElementById('download-csv');
-      downloadLink.href = url;
-      downloadLink.download = 'converted.csv';
-      downloadLink.style.display = 'block';
+        const items = xmlDoc.querySelectorAll('item');
+        const data = [];
+
+        items.forEach(item => {
+            const row = {};
+            item.childNodes.forEach(node => {
+                if (node.nodeType === Node.ELEMENT_NODE) {
+                    const value = node.textContent.trim();
+                    row[node.nodeName] = value;
+                }
+            });
+            data.push(row);
+        });
+
+        const csv = Papa.unparse(data);
+        downloadCSV(csv);
     };
 
-    updateStatus(document.getElementById('convert-status'), document.getElementById('convert-status-icon'), 'Converting XML to CSV...', '...');
     reader.readAsText(file);
-  }
+}
 
-  document.getElementById('file-input').addEventListener('change', function() {
-    updateStatus(document.getElementById('upload-status'), document.getElementById('upload-status-icon'), 'XML file uploaded', 'check');
-  });
+function downloadCSV(csvContent) {
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'converted_data.csv';
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+}
 </script>
 </body>
 </html>
