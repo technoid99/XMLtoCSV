@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>XML to CSV Converter</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 20px;
+  }
+  #file-input {
+    margin-bottom: 10px;
+  }
+  #result {
+    white-space: pre;
+  }
+</style>
+</head>
+<body>
+<h1>XML to CSV Converter</h1>
+<input type="file" id="file-input" accept=".xml">
+<div>
+  <button onclick="convertXMLtoCSV()">Convert</button>
+</div>
+<div id="result"></div>
+
+<script>
+  function convertXMLtoCSV() {
+    const fileInput = document.getElementById('file-input');
+    const file = fileInput.files[0];
+
+    if (!file) {
+      alert('Please select a file.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function(event) {
+      const xml = event.target.result;
+      const parser = new DOMParser();
+      const xmlDoc = parser.parseFromString(xml, 'text/xml');
+      
+      const rows = xmlDoc.querySelectorAll('*');
+      let csvContent = '';
+
+      for (const row of rows) {
+        const cells = row.children;
+        let rowContent = '';
+        for (const cell of cells) {
+          rowContent += cell.textContent.trim() + ',';
+        }
+        csvContent += rowContent.slice(0, -1) + '\n'; // Remove trailing comma and add new line
+      }
+
+      document.getElementById('result').innerText = csvContent;
+    };
+
+    reader.readAsText(file);
+  }
+</script>
+</body>
+</html>
