@@ -35,7 +35,7 @@
   </div>
 </div>
 <div id="result"></div>
-<button id="download-csv" style="display:none;">Download CSV</button>
+<a id="download-csv" style="display:none;">Download CSV</a>
 
 <script>
   function updateStatus(statusElement, statusIconElement, message, icon) {
@@ -78,10 +78,10 @@
 
       const blob = new Blob([csvContent], { type: 'text/csv' });
       const url = URL.createObjectURL(blob);
-      const downloadButton = document.getElementById('download-csv');
-      downloadButton.href = url;
-      downloadButton.download = 'converted.csv';
-      downloadButton.style.display = 'block';
+      const downloadLink = document.getElementById('download-csv');
+      downloadLink.href = url;
+      downloadLink.download = 'converted.csv';
+      downloadLink.style.display = 'block';
     };
 
     updateStatus(document.getElementById('convert-status'), document.getElementById('convert-status-icon'), 'Converting XML to CSV...', '...');
