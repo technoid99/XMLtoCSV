@@ -4,15 +4,68 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>XML to CSV Converter</title>
+<style>
+    .results-table {
+    border-collapse: collapse; /* Collapses borders into a single border */
+    width: 100%; /* Optional: Sets the table width to 100% of its container */
+    }
+
+    .results-table th,
+    .results-table td {
+        border: 1px solid #000; /* Adds a border to each cell */
+        padding: 5px; /* Adds padding to each cell for better readability */
+    }
+
+    #deleteOptions {
+        display: flex;
+        align-items: center; /* Aligns items vertically in the center */
+        gap: 5px; /* Adds space between the elements */
+    }
+
+    .results-table th {
+        background-color: #f2f2f2; /* Optional: Adds a background color to the header row */
+        font-weight: bold; /* Makes the header text bold */
+    }
+</style>
 </head>
 <body>
 <h1>XML to CSV Converter</h1>
 <input type="file" id="fileInput" accept=".xml">
-<button onclick="convertToCSV()">Convert</button>
+<div id="buttonContainer">
+    <button onclick="convertToCSV()">Convert and Download</button>
+    <button onclick="convertToCSVAndShow()">Convert and Show</button>
+</div>
+
+<div id="csvTableContainer" style="display:none;">
+    <H3>CSV Results (first 10 rows only)</H3>
+    <a id="editLink" href="#editAnchor" style="display:none;">Edit CSV</a>
+    <table id="csvTable" class="results-table"></table>
+    <p id="totalRows"></p>
+    <a id="editAnchor"></a> <!-- This is the anchor the "Edit" link will jump to -->
+    <div id="deleteOptions" style="display:none;">
+        Delete rows where <select id="columnHeaders"></select> has value <select id="conditionValueDropdown"></select>
+        <button id="deleteRowsButton" onclick="deleteRowsBasedOnCondition()">Delete Rows</button>
+        <button id="downloadButton" onclick="downloadFilteredCSV()" style="display:none;">Download Filtered CSV</button>
+    </div>
+    <p>The second drop down box contains only a maximum of 20 options</p>
+</div>
+
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
 
 <script>
+function downloadCSV(csvContent) {
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", "converted_data.csv");
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
 function convertToCSV() {
     const fileInput = document.getElementById('fileInput');
     const file = fileInput.files[0];
@@ -44,16 +97,150 @@ function convertToCSV() {
     reader.readAsText(file);
 }
 
-function downloadCSV(csvContent) {
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'converted_data.csv';
-    document.body.appendChild(a);
-    a.click();
-    window.URL.revokeObjectURL(url);
-    document.body.removeChild(a);
+function convertToCSVAndShow() {
+    const fileInput = document.getElementById('fileInput');
+    const file = fileInput.files[0];
+    const reader = new FileReader();
+
+    reader.onload = function(e) {
+        const xmlString = e.target.result;
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(xmlString, 'text/xml');
+
+        const items = xmlDoc.querySelectorAll('item');
+        const data = [];
+
+        items.forEach(item => {
+            const row = {};
+            item.childNodes.forEach(node => {
+                if (node.nodeType === Node.ELEMENT_NODE) {
+                    const value = node.textContent.trim();
+                    row[node.nodeName] = value;
+                }
+            });
+            data.push(row);
+        });
+
+        csvContent = Papa.unparse(data);
+        displayCSV(csvContent);
+    };
+
+    reader.readAsText(file);
+}
+
+function displayCSV(csvContent) {
+    const csvData = Papa.parse(csvContent, { header: true }).data;
+    const table = document.getElementById('csvTable');
+    const totalRows = document.getElementById('totalRows');
+    const columnHeaders = document.getElementById('columnHeaders');
+    const conditionValueDropdown = document.getElementById('conditionValueDropdown');
+
+    // Display first 10 lines of CSV in table
+    let tableHTML = '<tr>';
+    const headers = Object.keys(csvData[0]);
+    headers.forEach(header => {
+        tableHTML += `<th>${header}</th>`;
+        const option = document.createElement('option');
+        option.value = header;
+        option.textContent = header;
+        columnHeaders.appendChild(option);
+    });
+    tableHTML += '</tr>';
+    csvData.slice(0, 10).forEach(row => {
+        tableHTML += '<tr>';
+        headers.forEach(header => {
+            tableHTML += `<td>${row[header]}</td>`;
+        });
+        tableHTML += '</tr>';
+    });
+    table.innerHTML = tableHTML;
+
+    // List total number of rows
+    totalRows.textContent = `Total Rows: ${csvData.length}`;
+
+    // Show the table and total rows
+    document.getElementById('csvTableContainer').style.display = 'block';
+    document.getElementById('columnHeaders').style.display = '';
+    document.getElementById('conditionValueDropdown').style.display = '';
+    document.getElementById('deleteRowsButton').style.display = '';
+
+    // Populate the dropdown with unique values of the selected column
+    columnHeaders.addEventListener('change', function() {
+        const selectedColumn = this.value;
+        const uniqueValues = [...new Set(csvData.map(row => row[selectedColumn]))];
+        const uniqueValuesLimited = uniqueValues.slice(0, 20000); // Limit to 20 items
+
+        uniqueValuesLimited.sort((a, b) => {
+            // Convert to number if possible, otherwise compare as strings
+            const numA = Number(a);
+            const numB = Number(b);
+            if (!isNaN(numA) && !isNaN(numB)) {
+                return numA - numB; // Numeric sort
+            } else {
+                return a.localeCompare(b); // Alphabetic sort
+            }
+        });
+        conditionValueDropdown.innerHTML = '';
+
+        // Populate the dropdown with unique values
+        uniqueValuesLimited.forEach(value => {
+            const option = document.createElement('option');
+            option.value = value;
+            option.textContent = value;
+            conditionValueDropdown.appendChild(option);
+        });
+    });
+
+    // After displaying the CSV data, make the "Edit" link visible
+    document.getElementById('editLink').style.display = '';
+    document.getElementById('deleteOptions').style.display = '';
+    // Hide the download button when the table is updated
+    document.getElementById('downloadButton').style.display = 'none';
+
+}
+
+// the "Delete Rows" button will delete rows based on the user's selection, 
+// update the table and total row count, and provide a download button for 
+// the user to download the resulting CSV. The user can continue to delete 
+// rows and download the CSV as needed.
+function deleteRowsBasedOnCondition() {
+    const columnHeader = document.getElementById('columnHeaders').value;
+    const conditionValue = document.getElementById('conditionValueDropdown').value;
+    const csvData = Papa.parse(csvContent, { header: true }).data;
+    const filteredData = csvData.filter(row => row[columnHeader] !== conditionValue);
+
+    // Update the table with the filtered data
+    csvContent = Papa.unparse(filteredData);
+    displayCSV(csvContent);
+
+    // Update the total row count
+    document.getElementById('totalRows').textContent = `Total Rows: ${filteredData.length}`;
+
+    const columnHeaders = document.getElementById('columnHeaders');
+    const conditionValueDropdown = document.getElementById('conditionValueDropdown');
+    columnHeaders.innerHTML = '';
+    conditionValueDropdown.innerHTML = '';
+    const headers = Object.keys(filteredData[0]);
+    headers.forEach(header => {
+        const option = document.createElement('option');
+        option.value = header;
+        option.textContent = header;
+        columnHeaders.appendChild(option);
+    });
+    const uniqueValues = [...new Set(filteredData.map(row => row[columnHeader]))];
+    uniqueValues.forEach(value => {
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = value;
+        conditionValueDropdown.appendChild(option);
+    });
+
+    // Show the download button
+    document.getElementById('downloadButton').style.display = '';
+}
+
+function downloadFilteredCSV() {
+    downloadCSV(csvContent);
 }
 </script>
 </body>
